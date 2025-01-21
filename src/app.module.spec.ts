@@ -1,8 +1,7 @@
-// app.module.spec.ts
-import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ClientsModule } from '@nestjs/microservices';
+import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AppModule } from './app.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { Application } from './applications/entities/application.entity';
@@ -16,7 +15,9 @@ const mockEnvConfig = {
     DB_USERNAME: 'postgres',
     DB_PASSWORD: 'admin',
     DB_NAME: 'application_service_db',
-    NODE_ENV: 'development'
+    REDIS_HOST: 'localhost',
+    REDIS_PORT: '6380',
+    NODE_ENV: 'test'
 };
 
 jest.mock('@nestjs/typeorm', () => ({
@@ -44,7 +45,8 @@ describe('AppModule', () => {
                 ConfigModule.forRoot({
                     isGlobal: true,
                     load: [() => mockEnvConfig]
-                })
+                }),
+                ClientsModule.register([]) // Simular ClientsModule
             ],
             controllers: [AppController],
             providers: [
@@ -168,6 +170,27 @@ describe('AppModule', () => {
                 inject: [ConfigService],
             });
             expect(typeOrmModule).toBeDefined();
+        });
+    });
+
+    describe('Redis Configuration', () => {
+        it('should configure Redis client correctly', () => {
+            const redisConfig = {
+                transport: 'redis',
+                options: {
+                    host: configService.get('REDIS_HOST'),
+                    port: parseInt(configService.get('REDIS_PORT')),
+                    retryAttempts: 5,
+                    retryDelay: 1000,
+                    tls: configService.get('NODE_ENV') === 'production' ? {
+                        rejectUnauthorized: false
+                    } : undefined,
+                },
+            };
+
+            expect(redisConfig.transport).toBe('redis');
+            expect(redisConfig.options.host).toBe('localhost');
+            expect(redisConfig.options.port).toBe(6380);
         });
     });
 });
